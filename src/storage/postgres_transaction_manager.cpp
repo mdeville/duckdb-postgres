@@ -34,7 +34,7 @@ void PostgresTransactionManager::RollbackTransaction(Transaction &transaction) {
 void PostgresTransactionManager::Checkpoint(ClientContext &context, bool force) {
 	auto &transaction = PostgresTransaction::Get(context, db.GetCatalog());
 	auto &db = transaction.GetConnection();
-	db.Execute("CHECKPOINT");
+	db.Execute(context, "CHECKPOINT");
 }
 
 } // namespace duckdb

@@ -20,7 +20,7 @@ struct PostgresTextReader : public PostgresResultReader {
 	~PostgresTextReader() override;
 
 public:
-	void BeginCopy(const string &sql) override;
+	void BeginCopy(ClientContext &context, const string &sql) override;
 	PostgresReadResult Read(DataChunk &result) override;
 
 private:

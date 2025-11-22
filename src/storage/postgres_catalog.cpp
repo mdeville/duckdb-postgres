@@ -11,7 +11,7 @@
 namespace duckdb {
 
 PostgresCatalog::PostgresCatalog(AttachedDatabase &db_p, string connection_string_p, string attach_path_p,
-                                 AccessMode access_mode, string schema_to_load, PostgresIsolationLevel isolation_level)
+                                 AccessMode access_mode, string schema_to_load, PostgresIsolationLevel isolation_level, ClientContext &context)
     : Catalog(db_p), connection_string(std::move(connection_string_p)), attach_path(std::move(attach_path_p)),
       access_mode(access_mode), isolation_level(isolation_level), schemas(*this, schema_to_load),
       connection_pool(*this), default_schema(schema_to_load) {
@@ -25,7 +25,7 @@ PostgresCatalog::PostgresCatalog(AttachedDatabase &db_p, string connection_strin
 	}
 
 	auto connection = connection_pool.GetConnection();
-	this->version = connection.GetConnection().GetPostgresVersion();
+	this->version = connection.GetConnection().GetPostgresVersion(context);
 }
 
 string EscapeConnectionString(const string &input) {

@@ -60,16 +60,16 @@ static bool ResultHasError(PGresult *result) {
 	}
 }
 
-PGresult *PostgresConnection::PQExecute(const string &query) {
+PGresult *PostgresConnection::PQExecute(ClientContext &context, const string &query) {
 	if (PostgresConnection::DebugPrintQueries()) {
 		Printer::Print(query + "\n");
 	}
 	return PQexec(GetConn(), query.c_str());
 }
 
-unique_ptr<PostgresResult> PostgresConnection::TryQuery(const string &query, optional_ptr<string> error_message) {
+unique_ptr<PostgresResult> PostgresConnection::TryQuery(ClientContext &context, const string &query, optional_ptr<string> error_message) {
 	lock_guard<mutex> guard(connection->connection_lock);
-	auto result = PQExecute(query.c_str());
+	auto result = PQExecute(context, query.c_str());
 	if (ResultHasError(result)) {
 		if (error_message) {
 			*error_message = StringUtil::Format("Failed to execute query \"" + query +
@@ -81,17 +81,17 @@ unique_ptr<PostgresResult> PostgresConnection::TryQuery(const string &query, opt
 	return make_uniq<PostgresResult>(result);
 }
 
-unique_ptr<PostgresResult> PostgresConnection::Query(const string &query) {
+unique_ptr<PostgresResult> PostgresConnection::Query(ClientContext &context, const string &query) {
 	string error_msg;
-	auto result = TryQuery(query, &error_msg);
+	auto result = TryQuery(context, query, &error_msg);
 	if (!result) {
 		throw std::runtime_error(error_msg);
 	}
 	return result;
 }
 
-void PostgresConnection::Execute(const string &query) {
-	Query(query);
+void PostgresConnection::Execute(ClientContext &context, const string &query) {
+	Query(context, query);
 }
 
 vector<unique_ptr<PostgresResult>> PostgresConnection::ExecuteQueries(ClientContext &context, const string &queries) {
@@ -121,8 +121,8 @@ vector<unique_ptr<PostgresResult>> PostgresConnection::ExecuteQueries(ClientCont
 	return results;
 }
 
-PostgresVersion PostgresConnection::GetPostgresVersion() {
-	auto result = TryQuery("SELECT version(), (SELECT COUNT(*) FROM pg_settings WHERE name LIKE 'rds%')");
+PostgresVersion PostgresConnection::GetPostgresVersion(ClientContext &context) {
+	auto result = TryQuery(context, "SELECT version(), (SELECT COUNT(*) FROM pg_settings WHERE name LIKE 'rds%')");
 	if (!result) {
 		PostgresVersion version;
 		version.type_v = PostgresInstanceType::UNKNOWN;

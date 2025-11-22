@@ -56,7 +56,7 @@ void PostgresConnection::BeginCopyTo(ClientContext &context, PostgresCopyState &
 	}
 	query += ")";
 
-	PostgresResult pg_res(PQExecute(query.c_str()));
+	PostgresResult pg_res(PQExecute(context, query.c_str()));
 	auto result = pg_res.res;
 	if (!result || PQresultStatus(result) != PGRES_COPY_IN) {
 		throw std::runtime_error("Failed to prepare COPY \"" + query + "\": " + string(PQresultErrorMessage(result)));

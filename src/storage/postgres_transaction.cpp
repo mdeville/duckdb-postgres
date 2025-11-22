@@ -26,13 +26,13 @@ void PostgresTransaction::Start() {
 void PostgresTransaction::Commit() {
 	if (transaction_state == PostgresTransactionState::TRANSACTION_STARTED) {
 		transaction_state = PostgresTransactionState::TRANSACTION_FINISHED;
-		GetConnectionRaw().Execute("COMMIT");
+		GetConnectionRaw().Execute(GetContext(), "COMMIT");
 	}
 }
 void PostgresTransaction::Rollback() {
 	if (transaction_state == PostgresTransactionState::TRANSACTION_STARTED) {
 		transaction_state = PostgresTransactionState::TRANSACTION_FINISHED;
-		GetConnectionRaw().Execute("ROLLBACK");
+		GetConnectionRaw().Execute(GetContext(), "ROLLBACK");
 	}
 }
 
@@ -72,7 +72,7 @@ PostgresConnection &PostgresTransaction::GetConnection() {
 	if (transaction_state == PostgresTransactionState::TRANSACTION_NOT_YET_STARTED) {
 		transaction_state = PostgresTransactionState::TRANSACTION_STARTED;
 		string query = GetBeginTransactionQuery();
-		con.Execute(query);
+		con.Execute(GetContext(), query);
 	}
 	return con;
 }
@@ -91,9 +91,9 @@ unique_ptr<PostgresResult> PostgresTransaction::Query(const string &query) {
 		transaction_state = PostgresTransactionState::TRANSACTION_STARTED;
 		string transaction_start = GetBeginTransactionQuery();
 		transaction_start += ";\n";
-		return con.Query(transaction_start + query);
+		return con.Query(GetContext(), transaction_start + query);
 	}
-	return con.Query(query);
+	return con.Query(GetContext(), query);
 }
 
 unique_ptr<PostgresResult> PostgresTransaction::QueryWithoutTransaction(const string &query) {
@@ -104,7 +104,7 @@ unique_ptr<PostgresResult> PostgresTransaction::QueryWithoutTransaction(const st
 	if (access_mode == AccessMode::READ_ONLY) {
 		throw std::runtime_error("Execution without a Transaction is not possible in Read Only Mode");
 	}
-	return con.Query(query);
+	return con.Query(GetContext(), query);
 }
 
 vector<unique_ptr<PostgresResult>> PostgresTransaction::ExecuteQueries(ClientContext& context, const string &queries) {

@@ -64,7 +64,7 @@ private:
 	PostgresConnection connection;
 };
 
-static void PostgresGetSnapshot(PostgresVersion version, const PostgresBindData &bind_data,
+static void PostgresGetSnapshot(ClientContext &context, PostgresVersion version, const PostgresBindData &bind_data,
                                 PostgresGlobalState &gstate) {
 	unique_ptr<PostgresResult> result;
 	// by default disable snapshotting
@@ -79,7 +79,7 @@ static void PostgresGetSnapshot(PostgresVersion version, const PostgresBindData 
 	auto &con = gstate.GetConnection();
 	// pg_stat_wal_receiver was introduced in PostgreSQL 9.6
 	if (version < PostgresVersion(9, 6, 0)) {
-		result = con.TryQuery("SELECT pg_is_in_recovery(), pg_export_snapshot()");
+		result = con.TryQuery(context, "SELECT pg_is_in_recovery(), pg_export_snapshot()");
 		if (result) {
 			auto in_recovery = result->GetBool(0, 0);
 			if (!in_recovery) {
@@ -90,7 +90,7 @@ static void PostgresGetSnapshot(PostgresVersion version, const PostgresBindData 
 	}
 
 	result =
-	    con.TryQuery("SELECT pg_is_in_recovery(), pg_export_snapshot(), (select count(*) from pg_stat_wal_receiver)");
+	    con.TryQuery(context, "SELECT pg_is_in_recovery(), pg_export_snapshot(), (select count(*) from pg_stat_wal_receiver)");
 	if (result) {
 		auto in_recovery = result->GetBool(0, 0) || result->GetInt64(0, 2) > 0;
 		gstate.snapshot = "";
@@ -183,9 +183,9 @@ static unique_ptr<FunctionData> PostgresBind(ClientContext &context, TableFuncti
 	bind_data->attach_path = bind_data->dsn;
 
 	auto con = PostgresConnection::Open(bind_data->dsn, bind_data->attach_path);
-	auto version = con.GetPostgresVersion();
+	auto version = con.GetPostgresVersion(context);
 	// query the table schema so we can interpret the bits in the pages
-	auto info = PostgresTableSet::GetTableInfo(con, bind_data->schema_name, bind_data->table_name);
+	auto info = PostgresTableSet::GetTableInfo(context, con, bind_data->schema_name, bind_data->table_name);
 
 	bind_data->postgres_types = info->postgres_types;
 	for (auto &col : info->create_info->columns.Logical()) {
@@ -303,10 +303,10 @@ static idx_t PostgresMaxThreads(ClientContext &context, const FunctionData *bind
 static unique_ptr<LocalTableFunctionState> GetLocalState(ClientContext &context, TableFunctionInitInput &input,
                                                          PostgresGlobalState &gstate);
 
-static void PostgresScanConnect(PostgresConnection &conn, string snapshot) {
-	conn.Execute("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+static void PostgresScanConnect(ClientContext &context, PostgresConnection &conn, string snapshot) {
+	conn.Execute(context, "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
 	if (!snapshot.empty()) {
-		conn.Query(StringUtil::Format("SET TRANSACTION SNAPSHOT '%s'", snapshot));
+		conn.Query(context, StringUtil::Format("SET TRANSACTION SNAPSHOT '%s'", snapshot));
 	}
 }
 
@@ -323,7 +323,7 @@ static unique_ptr<GlobalTableFunctionState> PostgresInitGlobalState(ClientContex
 	} else {
 		auto con = PostgresConnection::Open(bind_data.dsn, bind_data.attach_path);
 		if (bind_data.use_transaction) {
-			PostgresScanConnect(con, string());
+			PostgresScanConnect(context, con, string());
 		}
 		result->SetConnection(std::move(con));
 	}
@@ -353,7 +353,7 @@ static unique_ptr<GlobalTableFunctionState> PostgresInitGlobalState(ClientContex
 		result->collection->InitializeScan(result->scan_state);
 	} else {
 		// we create a transaction here, and get the snapshot id to enable transaction-safe parallelism
-		PostgresGetSnapshot(bind_data.version, bind_data, *result);
+		PostgresGetSnapshot(context, bind_data.version, bind_data, *result);
 	}
 	return std::move(result);
 }
@@ -407,7 +407,7 @@ bool PostgresGlobalState::TryOpenNewConnection(ClientContext &context, PostgresL
 	} else {
 		lstate.connection = PostgresConnection::Open(bind_data.dsn, bind_data.attach_path);
 	}
-	PostgresScanConnect(lstate.connection, snapshot);
+	PostgresScanConnect(context, lstate.connection, snapshot);
 	return true;
 }
 
@@ -458,7 +458,7 @@ void PostgresLocalState::ScanChunk(ClientContext &context, const PostgresBindDat
 			return;
 		}
 		if (!exec) {
-			reader->BeginCopy(sql);
+			reader->BeginCopy(context, sql);
 			exec = true;
 		}
 		auto read_result = reader->Read(output);

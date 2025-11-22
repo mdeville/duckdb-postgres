@@ -173,10 +173,10 @@ unique_ptr<PostgresTableInfo> PostgresTableSet::GetTableInfo(PostgresTransaction
 	return table_info;
 }
 
-unique_ptr<PostgresTableInfo> PostgresTableSet::GetTableInfo(PostgresConnection &connection, const string &schema_name,
+unique_ptr<PostgresTableInfo> PostgresTableSet::GetTableInfo(ClientContext &context, PostgresConnection &connection, const string &schema_name,
                                                              const string &table_name) {
 	auto query = PostgresTableSet::GetInitializeQuery(schema_name, table_name);
-	auto result = connection.Query(query);
+	auto result = connection.Query(context, query);
 	auto rows = result->Count();
 	if (rows == 0) {
 		throw InvalidInputException("Table %s does not contain any columns.", table_name);

@@ -197,7 +197,7 @@ optional_ptr<CatalogEntry> PostgresTypeSet::CreateType(PostgresTransaction &tran
 	auto &conn = transaction.GetConnection();
 
 	auto create_sql = GetCreateTypeSQL(info);
-	conn.Execute(create_sql);
+	conn.Execute(transaction.GetContext(), create_sql);
 	info.type.SetAlias(info.name);
 	auto pg_type = PostgresUtils::CreateEmptyPostgresType(info.type);
 	auto type_entry = make_shared_ptr<PostgresTypeEntry>(catalog, schema, info, pg_type);
