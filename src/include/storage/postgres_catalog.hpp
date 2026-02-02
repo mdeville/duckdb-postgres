@@ -21,13 +21,15 @@ class PostgresSchemaEntry;
 class PostgresCatalog : public Catalog {
 public:
 	explicit PostgresCatalog(AttachedDatabase &db_p, string connection_string, string attach_path,
-	                         AccessMode access_mode, string schema_to_load, PostgresIsolationLevel isolation_level, ClientContext &context);
+	                         AccessMode access_mode, string schema_to_load, PostgresIsolationLevel isolation_level, ClientContext &context,
+	                         string snapshot_id);
 	~PostgresCatalog();
 
 	string connection_string;
 	string attach_path;
 	AccessMode access_mode;
 	PostgresIsolationLevel isolation_level;
+	string snapshot_id;
 
 public:
 	void Initialize(bool load_builtin) override;
