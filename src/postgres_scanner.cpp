@@ -69,6 +69,10 @@ static void PostgresGetSnapshot(PostgresVersion version, const PostgresBindData 
 	unique_ptr<PostgresResult> result;
 	// by default disable snapshotting
 	gstate.snapshot = string();
+	if (!bind_data.snapshot_id.empty()) {
+		gstate.snapshot = bind_data.snapshot_id;
+		return;
+	}
 	if (gstate.max_threads <= 1) {
 		return;
 	}
@@ -167,6 +171,7 @@ void PostgresGlobalState::SetConnection(shared_ptr<OwnedPostgresConnection> conn
 
 void PostgresBindData::SetCatalog(PostgresCatalog &catalog) {
 	this->pg_catalog = &catalog;
+	this->snapshot_id = catalog.snapshot_id;
 }
 
 void PostgresBindData::SetTable(PostgresTableEntry &table) {
@@ -319,11 +324,14 @@ static unique_ptr<GlobalTableFunctionState> PostgresInitGlobalState(ClientContex
 		auto &transaction = Transaction::Get(context, *pg_catalog).Cast<PostgresTransaction>();
 		auto &con =
 		    bind_data.use_transaction ? transaction.GetConnection() : transaction.GetConnectionWithoutTransaction();
+		if (bind_data.use_transaction && !bind_data.snapshot_id.empty()) {
+			con.Query(StringUtil::Format("SET TRANSACTION SNAPSHOT '%s'", bind_data.snapshot_id));
+		}
 		result->SetConnection(con.GetConnection());
 	} else {
 		auto con = PostgresConnection::Open(bind_data.dsn, bind_data.attach_path);
 		if (bind_data.use_transaction) {
-			PostgresScanConnect(con, string());
+			PostgresScanConnect(con, bind_data.snapshot_id);
 		}
 		result->SetConnection(std::move(con));
 	}

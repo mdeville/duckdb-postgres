@@ -18,6 +18,7 @@ static unique_ptr<Catalog> PostgresAttach(optional_ptr<StorageExtensionInfo> sto
 
 	string secret_name;
 	string schema_to_load;
+	string snapshot_id;
 	PostgresIsolationLevel isolation_level = PostgresIsolationLevel::REPEATABLE_READ;
 	for (auto &entry : attach_options.options) {
 		auto lower_name = StringUtil::Lower(entry.first);
@@ -25,6 +26,8 @@ static unique_ptr<Catalog> PostgresAttach(optional_ptr<StorageExtensionInfo> sto
 			secret_name = entry.second.ToString();
 		} else if (lower_name == "schema") {
 			schema_to_load = entry.second.ToString();
+		} else if (lower_name == "snapshot_id") {
+			snapshot_id = entry.second.ToString();
 		} else if (lower_name == "isolation_level") {
 			auto param = entry.second.ToString();
 			auto lparam = StringUtil::Lower(param);
@@ -45,7 +48,8 @@ static unique_ptr<Catalog> PostgresAttach(optional_ptr<StorageExtensionInfo> sto
 	}
 	auto connection_string = PostgresCatalog::GetConnectionString(context, attach_path, secret_name);
 	return make_uniq<PostgresCatalog>(db, std::move(connection_string), std::move(attach_path),
-	                                  attach_options.access_mode, std::move(schema_to_load), isolation_level);
+	                                  attach_options.access_mode, std::move(schema_to_load), isolation_level,
+	                                  std::move(snapshot_id));
 }
 
 static unique_ptr<TransactionManager> PostgresCreateTransactionManager(optional_ptr<StorageExtensionInfo> storage_info,
