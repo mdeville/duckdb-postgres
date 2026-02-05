@@ -92,8 +92,9 @@ jobs:
     - name: Test extension
       env:
         POSTGRES_TEST_DATABASE_AVAILABLE: 1
+        LOCAL_EXTENSION_REPO: 'build/reldebug/repository'
         PGSERVICE: postgres
       run: |
         psql -c "SELECT 43"
         source ./create-postgres-tables.sh
-        make test_reldebug
+        ./build/reldebug/test/unittest --autoloading available
