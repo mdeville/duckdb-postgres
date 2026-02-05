@@ -1,5 +1,6 @@
 #include "duckdb.hpp"
 
+#include "duckdb/main/settings.hpp"
 #include "postgres_storage.hpp"
 #include "storage/postgres_catalog.hpp"
 #include "duckdb/parser/parsed_data/attach_info.hpp"
@@ -11,7 +12,7 @@ static unique_ptr<Catalog> PostgresAttach(optional_ptr<StorageExtensionInfo> sto
                                           AttachedDatabase &db, const string &name, AttachInfo &info,
                                           AttachOptions &attach_options) {
 	auto &config = DBConfig::GetConfig(context);
-	if (!config.options.enable_external_access) {
+	if (!Settings::Get<EnableExternalAccessSetting>(context)) {
 		throw PermissionException("Attaching Postgres databases is disabled through configuration");
 	}
 	string attach_path = info.path;
