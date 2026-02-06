@@ -11,7 +11,7 @@
 namespace duckdb {
 
 PostgresCatalog::PostgresCatalog(AttachedDatabase &db_p, string connection_string_p, string attach_path_p,
-                                 AccessMode access_mode, string schema_to_load, PostgresIsolationLevel isolation_level)
+                                 AccessMode access_mode, string schema_to_load, PostgresIsolationLevel isolation_level, ClientContext &context)
     : Catalog(db_p), connection_string(std::move(connection_string_p)), attach_path(std::move(attach_path_p)),
       access_mode(access_mode), isolation_level(isolation_level), schemas(*this, schema_to_load),
       connection_pool(*this), default_schema(schema_to_load) {
@@ -25,7 +25,7 @@ PostgresCatalog::PostgresCatalog(AttachedDatabase &db_p, string connection_strin
 	}
 
 	auto connection = connection_pool.GetConnection();
-	this->version = connection.GetConnection().GetPostgresVersion();
+	this->version = connection.GetConnection().GetPostgresVersion(context);
 }
 
 string EscapeConnectionString(const string &input) {
@@ -109,7 +109,7 @@ void PostgresCatalog::Initialize(bool load_builtin) {
 
 optional_ptr<CatalogEntry> PostgresCatalog::CreateSchema(CatalogTransaction transaction, CreateSchemaInfo &info) {
 	auto &postgres_transaction = PostgresTransaction::Get(transaction.GetContext(), *this);
-	auto entry = schemas.GetEntry(postgres_transaction, info.schema);
+	auto entry = schemas.GetEntry(transaction.GetContext(), postgres_transaction, info.schema);
 	if (entry) {
 		switch (info.on_conflict) {
 		case OnCreateConflict::REPLACE_ON_CONFLICT: {
@@ -138,7 +138,7 @@ void PostgresCatalog::DropSchema(ClientContext &context, DropInfo &info) {
 
 void PostgresCatalog::ScanSchemas(ClientContext &context, std::function<void(SchemaCatalogEntry &)> callback) {
 	auto &postgres_transaction = PostgresTransaction::Get(context, *this);
-	schemas.Scan(postgres_transaction, [&](CatalogEntry &schema) { callback(schema.Cast<PostgresSchemaEntry>()); });
+	schemas.Scan(context, postgres_transaction, [&](CatalogEntry &schema) { callback(schema.Cast<PostgresSchemaEntry>()); });
 }
 
 optional_ptr<SchemaCatalogEntry> PostgresCatalog::LookupSchema(CatalogTransaction transaction,
@@ -149,7 +149,7 @@ optional_ptr<SchemaCatalogEntry> PostgresCatalog::LookupSchema(CatalogTransactio
 	if (schema_name == "pg_temp") {
 		schema_name = postgres_transaction.GetTemporarySchema();
 	}
-	auto entry = schemas.GetEntry(postgres_transaction, schema_name);
+	auto entry = schemas.GetEntry(transaction.GetContext(), postgres_transaction, schema_name);
 	if (!entry && if_not_found != OnEntryNotFound::RETURN_NULL) {
 		throw BinderException("Schema with name \"%s\" not found", schema_name);
 	}

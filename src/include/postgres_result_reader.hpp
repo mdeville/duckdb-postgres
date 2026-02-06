@@ -31,7 +31,7 @@ struct PostgresResultReader {
 	}
 
 public:
-	virtual void BeginCopy(const string &sql) = 0;
+	virtual void BeginCopy(ClientContext &context, const string &sql) = 0;
 	virtual PostgresReadResult Read(DataChunk &result) = 0;
 
 protected:

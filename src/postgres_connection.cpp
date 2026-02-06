@@ -2,6 +2,7 @@
 #include "duckdb/parser/column_list.hpp"
 #include "duckdb/parser/parser.hpp"
 #include "postgres_connection.hpp"
+#include "postgres_logging.hpp"
 #include "duckdb/common/types/uuid.hpp"
 #include "duckdb/common/shared_ptr.hpp"
 #include "duckdb/common/helper.hpp"
@@ -60,16 +61,26 @@ static bool ResultHasError(PGresult *result) {
 	}
 }
 
-PGresult *PostgresConnection::PQExecute(const string &query) {
+PGresult *PostgresConnection::PQExecute(optional_ptr<ClientContext> context, const string &query) {
 	if (PostgresConnection::DebugPrintQueries()) {
 		Printer::Print(query + "\n");
 	}
-	return PQexec(GetConn(), query.c_str());
+        int64_t start_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now())
+                          .time_since_epoch()
+                          .count();
+	auto res = PQexec(GetConn(), query.c_str());
+        int64_t end_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now())
+                          .time_since_epoch()
+                          .count();
+	if (context) {
+		DUCKDB_LOG(*context, PostgresQueryLogType, query, end_time - start_time);
+	}
+	return res;
 }
 
-unique_ptr<PostgresResult> PostgresConnection::TryQuery(const string &query, optional_ptr<string> error_message) {
+unique_ptr<PostgresResult> PostgresConnection::TryQuery(optional_ptr<ClientContext> context, const string &query, optional_ptr<string> error_message) {
 	lock_guard<mutex> guard(connection->connection_lock);
-	auto result = PQExecute(query.c_str());
+	auto result = PQExecute(context, query.c_str());
 	if (ResultHasError(result)) {
 		if (error_message) {
 			*error_message = StringUtil::Format("Failed to execute query \"" + query +
@@ -81,23 +92,26 @@ unique_ptr<PostgresResult> PostgresConnection::TryQuery(const string &query, opt
 	return make_uniq<PostgresResult>(result);
 }
 
-unique_ptr<PostgresResult> PostgresConnection::Query(const string &query) {
+unique_ptr<PostgresResult> PostgresConnection::Query(optional_ptr<ClientContext> context, const string &query) {
 	string error_msg;
-	auto result = TryQuery(query, &error_msg);
+	auto result = TryQuery(context, query, &error_msg);
 	if (!result) {
 		throw std::runtime_error(error_msg);
 	}
 	return result;
 }
 
-void PostgresConnection::Execute(const string &query) {
-	Query(query);
+void PostgresConnection::Execute(optional_ptr<ClientContext> context, const string &query) {
+	Query(context, query);
 }
 
-vector<unique_ptr<PostgresResult>> PostgresConnection::ExecuteQueries(const string &queries) {
+vector<unique_ptr<PostgresResult>> PostgresConnection::ExecuteQueries(ClientContext &context, const string &queries) {
 	if (PostgresConnection::DebugPrintQueries()) {
 		Printer::Print(queries + "\n");
 	}
+        int64_t start_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now())
+                          .time_since_epoch()
+                          .count();
 	auto res = PQsendQuery(GetConn(), queries.c_str());
 	if (res == 0) {
 		throw std::runtime_error("Failed to execute query \"" + queries + "\": " + string(PQerrorMessage(GetConn())));
@@ -118,11 +132,15 @@ vector<unique_ptr<PostgresResult>> PostgresConnection::ExecuteQueries(const stri
 		}
 		results.push_back(std::move(result));
 	}
+        int64_t end_time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now())
+                          .time_since_epoch()
+                          .count();
+	DUCKDB_LOG(context, PostgresQueryLogType, queries, end_time - start_time);
 	return results;
 }
 
-PostgresVersion PostgresConnection::GetPostgresVersion() {
-	auto result = TryQuery("SELECT version(), (SELECT COUNT(*) FROM pg_settings WHERE name LIKE 'rds%')");
+PostgresVersion PostgresConnection::GetPostgresVersion(ClientContext &context) {
+	auto result = TryQuery(context, "SELECT version(), (SELECT COUNT(*) FROM pg_settings WHERE name LIKE 'rds%')");
 	if (!result) {
 		PostgresVersion version;
 		version.type_v = PostgresInstanceType::UNKNOWN;

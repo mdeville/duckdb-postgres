@@ -13,8 +13,8 @@ PostgresTextReader::~PostgresTextReader() {
 	Reset();
 }
 
-void PostgresTextReader::BeginCopy(const string &sql) {
-	result = con.Query(sql);
+void PostgresTextReader::BeginCopy(ClientContext &context, const string &sql) {
+	result = con.Query(context, sql);
 	row_offset = 0;
 }
 

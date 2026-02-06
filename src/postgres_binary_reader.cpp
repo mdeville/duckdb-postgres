@@ -12,8 +12,8 @@ PostgresBinaryReader::~PostgresBinaryReader() {
 	Reset();
 }
 
-void PostgresBinaryReader::BeginCopy(const string &sql) {
-	con.BeginCopyFrom(sql, PGRES_COPY_OUT);
+void PostgresBinaryReader::BeginCopy(ClientContext &context, const string &sql) {
+	con.BeginCopyFrom(context, sql, PGRES_COPY_OUT);
 	if (!Next()) {
 		throw IOException("Failed to fetch header for COPY \"%s\"", sql);
 	}

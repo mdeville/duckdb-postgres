@@ -45,14 +45,14 @@ public:
 
 public:
 	static PostgresConnection Open(const string &dsn, const string &attach_path);
-	void Execute(const string &query);
-	unique_ptr<PostgresResult> TryQuery(const string &query, optional_ptr<string> error_message = nullptr);
-	unique_ptr<PostgresResult> Query(const string &query);
+	void Execute(optional_ptr<ClientContext> context, const string &query);
+	unique_ptr<PostgresResult> TryQuery(optional_ptr<ClientContext> context, const string &query, optional_ptr<string> error_message = nullptr);
+	unique_ptr<PostgresResult> Query(optional_ptr<ClientContext> context, const string &query);
 
 	//! Submits a set of queries to be executed in the connection.
-	vector<unique_ptr<PostgresResult>> ExecuteQueries(const string &queries);
+	vector<unique_ptr<PostgresResult>> ExecuteQueries(ClientContext &context, const string &queries);
 
-	PostgresVersion GetPostgresVersion();
+	PostgresVersion GetPostgresVersion(ClientContext &context);
 
 	vector<IndexInfo> GetIndexInfo(const string &table_name);
 
@@ -64,7 +64,7 @@ public:
 	void CopyChunk(ClientContext &context, PostgresCopyState &state, DataChunk &chunk, DataChunk &varchar_chunk);
 	void FinishCopyTo(PostgresCopyState &state);
 
-	void BeginCopyFrom(const string &query, ExecStatusType expected_result);
+	void BeginCopyFrom(ClientContext &context, const string &query, ExecStatusType expected_result);
 
 	bool IsOpen();
 	void Close();
@@ -87,7 +87,7 @@ public:
 	static bool DebugPrintQueries();
 
 private:
-	PGresult *PQExecute(const string &query);
+	PGresult *PQExecute(optional_ptr<ClientContext> context, const string &query);
 
 	shared_ptr<OwnedPostgresConnection> connection;
 	string dsn;

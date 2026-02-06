@@ -89,7 +89,7 @@ unique_ptr<GlobalSinkState> PostgresUpdate::GetGlobalSinkState(ClientContext &co
 	auto &connection = transaction.GetConnection();
 	// create a temporary table to stream the update data into
 	result->update_table_name = "update_data_" + UUID::ToString(UUID::GenerateRandomUUID());
-	connection.Execute(CreateUpdateTable(result->update_table_name, postgres_table, columns));
+	connection.Execute(context, CreateUpdateTable(result->update_table_name, postgres_table, columns));
 	// generate the final UPDATE sql
 	result->update_sql = GetUpdateSQL(result->update_table_name, postgres_table, columns);
 	// initialize the insertion chunk
@@ -170,14 +170,14 @@ SinkFinalizeType PostgresUpdate::Finalize(Pipeline &pipeline, Event &event, Clie
 	auto &connection = transaction.GetConnection();
 	gstate.FinishCopyTo(connection);
 	// merge the update_info table into the actual table (i.e. perform the actual update)
-	connection.Execute(gstate.update_sql);
+	connection.Execute(context, gstate.update_sql);
 	return SinkFinalizeType::READY;
 }
 
 //===--------------------------------------------------------------------===//
 // GetData
 //===--------------------------------------------------------------------===//
-SourceResultType PostgresUpdate::GetData(ExecutionContext &context, DataChunk &chunk,
+SourceResultType PostgresUpdate::GetDataInternal(ExecutionContext &context, DataChunk &chunk,
                                          OperatorSourceInput &input) const {
 	auto &insert_gstate = sink_state->Cast<PostgresUpdateGlobalState>();
 	chunk.SetCardinality(1);

@@ -145,7 +145,7 @@ void PostgresTypeSet::InitializeCompositeTypes(PostgresTransaction &transaction,
 	}
 }
 
-void PostgresTypeSet::LoadEntries(PostgresTransaction &transaction) {
+void PostgresTypeSet::LoadEntries(ClientContext &context, PostgresTransaction &transaction) {
 	if (!enum_result || !composite_type_result) {
 		throw InternalException("PostgresTypeSet::LoadEntries not defined without enum/composite type result");
 	}
@@ -197,7 +197,7 @@ optional_ptr<CatalogEntry> PostgresTypeSet::CreateType(PostgresTransaction &tran
 	auto &conn = transaction.GetConnection();
 
 	auto create_sql = GetCreateTypeSQL(info);
-	conn.Execute(create_sql);
+	conn.Execute(transaction.GetContext(), create_sql);
 	info.type.SetAlias(info.name);
 	auto pg_type = PostgresUtils::CreateEmptyPostgresType(info.type);
 	auto type_entry = make_shared_ptr<PostgresTypeEntry>(catalog, schema, info, pg_type);

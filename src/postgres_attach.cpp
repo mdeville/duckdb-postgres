@@ -59,7 +59,7 @@ GROUP BY relname
 ORDER BY relname;
 )",
 	    KeywordHelper::WriteQuoted(data.source_schema));
-	auto res = conn.Query(fetch_table_query);
+	auto res = conn.Query(context, fetch_table_query);
 	for (idx_t row = 0; row < PQntuples(res->res); row++) {
 		auto table_name = res->GetString(row, 0);
 		string query;

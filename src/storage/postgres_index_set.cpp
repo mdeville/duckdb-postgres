@@ -1,6 +1,7 @@
 #include "storage/postgres_index_set.hpp"
 #include "storage/postgres_schema_entry.hpp"
 #include "storage/postgres_transaction.hpp"
+#include "duckdb/parser/expression/columnref_expression.hpp"
 #include "duckdb/parser/parsed_data/create_schema_info.hpp"
 #include "storage/postgres_index_entry.hpp"
 #include "duckdb/parser/parsed_expression_iterator.hpp"
@@ -26,7 +27,7 @@ ORDER BY pg_namespace.oid;
 	return StringUtil::Replace(base_query, "${CONDITION}", condition);
 }
 
-void PostgresIndexSet::LoadEntries(PostgresTransaction &transaction) {
+void PostgresIndexSet::LoadEntries(ClientContext &context, PostgresTransaction &transaction) {
 	if (!index_result) {
 		throw InternalException("PostgresIndexSet::LoadEntries called without an index result defined");
 	}
